@@ -14,6 +14,41 @@ contract SimpleVoting {
     STATE VARIABLES
     *****************************************/
 
+    /// @notice a way to store details of each stakeholder
+    /// @dev a struct to store the details of each stakeholder
+    /// @param role a variable to store the role of type enum 
+    /// @param hasVoted a boolean to store whether a person has voted or not 
+    /// @param candidateChosen a variable to show the candidate that was chosen
+    /// @param registeredAddress address that registered stakeholder
+    struct Stakeholder {
+        Role role;
+        bool hasVoted; 
+        uint256 candidateChosen; 
+        address stakeholderAddress;
+    } 
+
+    /// @notice a way to store details of each candidate
+    /// @dev a struct to store the details of each candidate
+    /// @param candidateID the id of the candidate
+    /// @param candidateName name of the candidate
+    /// @param registeredAddress address registered by the candidate
+    /// @param totalVotesReceived total votes received
+    /// @param votesReceivedBOD votes recieved from BOD
+    /// @param votesReceivedTeachers votes received from teachers
+    /// @param votesReceivedStudents votes received from students
+    /// @param receivedChairmansVote votes received from chairman
+    struct Candidate {
+        uint256 candidateID;
+        string candidateName;
+        address registeredAddress;
+        uint8 totalVotesReceived;
+        uint8 votesReceivedBOD;
+        uint8 votesReceivedTeachers;
+        uint8 votesReceivedStudents;
+        bool receivedChairmansVote;
+    }
+
+    uint maximumCandidates;
     /// @notice Public Variable to store the address of the chairman
     /// @dev Variable is of type address. The chairman has the supreme role of the stakeholders
     address public chairman; 
@@ -38,6 +73,10 @@ contract SimpleVoting {
     /// @dev an array of all the students addresses registered by the chairman
     address[] public studentList; //holds list of all students registered by the Chairman
 
+    /// @notice a list of all candidates registered by the chairman
+    /// @dev an array of all the candidates
+    Candidate[] public candidatesList; 
+
     /// @notice a declaration of different roles available to be assigned to stakeholders
     /// @dev an enum to represent the possible roles an address can take.
     enum Role {
@@ -47,48 +86,6 @@ contract SimpleVoting {
         CHAIRMAN
     } 
 
-
-    Stakeholder[] public stakeholderObject; 
-
-    /// @notice a way to store details of each stakeholder
-    /// @dev a struct to store the details of each stakeholder
-    /// @param role a variable to store the role of type enum 
-    /// @param hasVoted a boolean to store whether a person has voted or not 
-    /// @param candidateChosen a variable to show the candidate that was chosen
-    /// @param registeredAddress address that registered stakeholder
-    struct Stakeholder {
-        Role role;
-        bool hasVoted; 
-        uint256 candidateChosen; 
-        address registeredAddress;
-        address stakeholderAddress;
-    } 
-
-    /// @notice a list of all candidates registered by the chairman
-    /// @dev an array of all the candidates
-    Candidate[] public candidatesList; 
-
-    /// @notice a way to store details of each candidate
-    /// @dev a struct to store the details of each candidate
-    /// @param candidateID the id of the candidate
-    /// @param candidateName name of the candidate
-    /// @param registeredAddress address registered by the candidate
-    /// @param totalVotesReceived total votes received
-    /// @param votesReceivedBOD votes recieved from BOD
-    /// @param votesReceivedTeachers votes received from teachers
-    /// @param votesReceivedStudents votes received from students
-    /// @param receivedChairmansVote votes received from chairman
-    struct Candidate {
-        uint256 candidateID;
-        string candidateName;
-        address registeredAddress;
-        uint8 totalVotesReceived;
-        uint8 votesReceivedBOD;
-        uint8 votesReceivedTeachers;
-        uint8 votesReceivedStudents;
-        bool receivedChairmansVote;
-    }
-
     /// @notice a variable to show the voting status, if it's active or not
     /// @dev a boolean to show if voting is active or not
     bool public votingActive;
@@ -96,6 +93,17 @@ contract SimpleVoting {
     /// @notice a variable to show the results status, if it's public or not
     /// @dev a boolean to show if the results is public or not
     bool public resultsActive;
+
+    /// @notice a way to do some initializations at deployment
+    /// @dev a constructor to do some initializations at deployment
+    constructor(uint _maxCandidates) {
+        chairman = msg.sender;
+        votingActive = false;
+        resultsActive = false;
+        createStakeHolder(msg.sender, 3); //add the chairperson as a stakeholder
+        BODList.push(msg.sender); //add the chairperson to the BOD LIST
+        maximumCandidates = _maxCandidates;
+    }
 
     
     /****************************************
@@ -121,26 +129,26 @@ contract SimpleVoting {
     event Vote(string message);
 
 
-    /// @notice a way to do some initializations at deployment
-    /// @dev a constructor to do some initializations at deployment
-    constructor() {
-        chairman = msg.sender;
-        votingActive = false;
-        resultsActive = false;
-        createStakeHolder(msg.sender, 3); //add the chairperson as a stakeholder
-        BODList.push(msg.sender); //add the chairperson to the BOD LIST
-    }
 
-    //new function to allow chairman transfer his rights
-    function transferChairman (address _address) public onlyByChairman {
-        require (isABOD(_address), "Only BODs can be a chairman");
-        chairman = _address;
-        stakeholders[_address].role = Role(3); //change role of new chairman
-        stakeholders[msg.sender].role = Role(0); //change role of old chairman
-    }
-
-    function getCurrentChairmanAddress() public view returns (address) {
-        return chairman;
+    /// @notice create a candidate
+    /// @dev a function to add a candidate
+    /// @param _candidateName The name of the impending candidate
+    function createCandidate(string memory _candidateName)
+        public
+        onlyByChairman
+    {
+        require(candidatesList.length <= maximumCandidates, "cannot add more candidates");
+        uint256 candidateID;
+        if (candidatesList.length == 0) {
+            candidateID = 0;
+        } else {
+            candidateID = candidatesList.length;
+        }
+        // bytes memory candidateName = toBytes(_candidateName);
+        candidatesList.push(
+            Candidate(candidateID, _candidateName, msg.sender, 0, 0, 0, 0, false)
+        );
+        emit CreateCandidate("You just added a new candidate");
     }
 
     /// @notice create a stakeholder
@@ -153,11 +161,11 @@ contract SimpleVoting {
     {
         require(!isAStakeholder(_address), "This address is already registered");
         //add stakeholders to the mapping
-        stakeholders[_address] = Stakeholder(Role(_role), false, 8, msg.sender, _address); 
-        //add stakeholders to the array that holds all structs of stakeholders
-        stakeholderObject.push(stakeholders[_address]); 
+        stakeholders[_address] = Stakeholder(Role(_role), false, 8, _address); 
+
         // add stakeholder's adress to the list of stakeHolders addresses
         stakeholdersList.push(_address); 
+
         //add stakeholder's adress to the corresponding list based on roles
         if (stakeholders[_address].role == Role(0)) {
             BODList.push(_address);
@@ -183,6 +191,61 @@ contract SimpleVoting {
 
         emit CreateMultipleStakeHolders("You just created multiple stakeholders", _role);
     }
+
+    /// @notice vote for a candidate
+    /// @dev a function to vote a candidate
+    /// @param _candidateID The id of the candidate you want to vote for
+    function vote (uint256 _candidateID) public onlyStakeHolders {
+        require(stakeholders[msg.sender].hasVoted == false, "You have voted before");
+        require(votingActive == true, "Voting Session is not active");
+        stakeholders[msg.sender].hasVoted = true; //mark that this stakeholder has voted
+        stakeholders[msg.sender].candidateChosen = _candidateID; //store who this stakeholder voted for
+
+        candidatesList[_candidateID].totalVotesReceived += 1;
+        
+        if (stakeholders[msg.sender].role == Role(0)){
+            candidatesList[_candidateID].votesReceivedBOD += 1;
+        }
+        if (stakeholders[msg.sender].role == Role(1)){
+            candidatesList[_candidateID].votesReceivedTeachers += 1;
+        }
+        if (stakeholders[msg.sender].role == Role(2)){
+            candidatesList[_candidateID].votesReceivedStudents += 1;
+        }
+        if (msg.sender == chairman){
+            candidatesList[_candidateID].receivedChairmansVote = true;
+        }
+
+        emit Vote("You just voted a candidate");
+    }
+
+    //new function to allow chairman transfer his rights
+    function transferChairman (address _address) public onlyByChairman {
+        require (isABOD(_address), "Only BODs can be a chairman");
+        chairman = _address;
+        stakeholders[_address].role = Role(3); //change role of new chairman
+        stakeholders[msg.sender].role = Role(0); //change role of old chairman
+    }
+
+    /****************************************
+    TOGGLE VOTING/RESULTS ON AND OFF
+    *****************************************/    
+
+    /// @notice toggle voting status
+    /// @dev a function to toggle voting status, can only be called by the chairman
+    /// @return bool returns a boolean
+    function toggleVoting() public onlyByChairman returns (bool) {
+        votingActive = !votingActive;
+        return votingActive;
+    }
+    
+    /// @notice toggle result status
+    /// @dev a function to toggle result status, can only be called by the chairman
+    /// @return bool returns a boolean 
+    function toggleResult() public onlyByChairman returns (bool) {
+        resultsActive = !resultsActive;
+        return resultsActive;
+    }    
     
     /// @notice check if an address is a stakeholder
     /// @dev use a for loop to run the address through the array of stakeholder's list 
@@ -204,139 +267,6 @@ contract SimpleVoting {
             }
         }
         return false;
-    }
-
-    /// @notice create a candidate
-    /// @dev a function to add a candidate
-    /// @param _candidateName The name of the impending candidate
-    function createCandidate(string memory _candidateName)
-        public
-        onlyByChairman
-    {
-        uint256 candidateID;
-        if (candidatesList.length == 0) {
-            candidateID = 0;
-        } else {
-            candidateID = candidatesList.length;
-        }
-        // bytes memory candidateName = toBytes(_candidateName);
-        candidatesList.push(
-            Candidate(candidateID, _candidateName, msg.sender, 0, 0, 0, 0, false)
-        );
-        emit CreateCandidate("You just added a new candidate");
-    }
-
-    /// @notice get list of candidates
-    /// @dev a function to get list of candidates
-    /// @return Candidate[] returns an array of candidate structs
-    function getListOfCandidates() public view returns (Candidate[] memory) {
-        return candidatesList;
-    }
-
-    /// @notice get list of stakeholders
-    /// @dev a function to get list of stakeholders
-    /// @return address[] returns an array of addresses
-    function getListOfStakeHolders() public view returns (address[] memory) {
-        return stakeholdersList;
-    }
-
-    function getListOfStakeHoldersObjects() public view returns (Stakeholder[] memory) {
-        return stakeholderObject;
-    }
-
-    /// @notice get list of teachers
-    /// @dev a function to get list of teachers
-    /// @return address[] returns an array of addresses
-    function getListOfTeachers() public view returns (address[] memory) {
-        return teachersList;
-    }
-
-    /// @notice get list of students
-    /// @dev a function to get list of students
-    /// @return address[] returns an array of addresses
-    function getListOfStudents() public view returns (address[] memory) {
-        return studentList;
-    }
-
-    /// @notice get list of BODS
-    /// @dev a function to get list of the BODS
-    /// @return address[] returns an array of addresses
-    function getListOfBOD() public view returns (address[] memory) {
-        return BODList;
-    }
-
-    /****************************************
-    TOGGLE VOTING/RESULTS ON AND OFF
-    *****************************************/    
-
-    /// @notice toggle voting status
-    /// @dev a function to toggle voting status, can only be called by the chairman
-    /// @return bool returns a boolean
-    function toggleVoting() public onlyByChairman returns (bool) {
-        if (votingActive) {
-            votingActive = false;
-            return votingActive;
-        } else {
-            votingActive = true;
-            return votingActive;
-        }
-    }
-    
-    /// @notice toggle result status
-    /// @dev a function to toggle result status, can only be called by the chairman
-    /// @return bool returns a boolean 
-    function toggleResult() public onlyByChairman returns (bool) {
-        if (resultsActive) {
-            resultsActive = false;
-            return resultsActive;
-        } else {
-            resultsActive = true;
-            return resultsActive;
-        }
-    }
-
-    /****************************************
-    GET THE STATE OF VOTING AND RESULTS ACTIVE
-    *****************************************/ 
-    
-    function getVotingState() public view returns (bool) {
-        return votingActive;
-    } 
-
-    function getResultState() public view returns (bool) {
-        return resultsActive;
-    }
-
-    /****************************************
-    ENABLE A STAKEHOLDER TO VOTE
-    *****************************************/
-
-    
-    /// @notice vote for a candidate
-    /// @dev a function to vote a candidate
-    /// @param _candidateID The id of the candidate you want to vote for
-    function vote (uint256 _candidateID) public onlyStakeHolders {
-        require(stakeholders[msg.sender].hasVoted == false, "You have voted before");
-        require(votingActive == true, "Voting Session is not active");
-        stakeholders[msg.sender].hasVoted = true; //mark that this stakeholder has voted
-        stakeholders[msg.sender].candidateChosen = _candidateID; //store who this stakeholder voted for
-
-        candidatesList[_candidateID].totalVotesReceived = candidatesList[_candidateID].totalVotesReceived + 1;
-        
-        if (stakeholders[msg.sender].role == Role(0)){
-            candidatesList[_candidateID].votesReceivedBOD = candidatesList[_candidateID].votesReceivedBOD + 1;
-        }
-        if (stakeholders[msg.sender].role == Role(1)){
-            candidatesList[_candidateID].votesReceivedTeachers = candidatesList[_candidateID].votesReceivedTeachers + 1;
-        }
-        if (stakeholders[msg.sender].role == Role(2)){
-            candidatesList[_candidateID].votesReceivedStudents = candidatesList[_candidateID].votesReceivedStudents + 1;
-        }
-        if (msg.sender == chairman){
-            candidatesList[_candidateID].receivedChairmansVote = true;
-        }
-
-        emit Vote("You just voted a candidate");
     }
 
     /****************************************
