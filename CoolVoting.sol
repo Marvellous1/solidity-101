@@ -48,6 +48,7 @@ contract SimpleVoting {
         bool receivedChairmansVote;
     }
 
+    uint maximumCandidates;
     /// @notice Public Variable to store the address of the chairman
     /// @dev Variable is of type address. The chairman has the supreme role of the stakeholders
     address public chairman; 
@@ -95,12 +96,13 @@ contract SimpleVoting {
 
     /// @notice a way to do some initializations at deployment
     /// @dev a constructor to do some initializations at deployment
-    constructor() {
+    constructor(uint _maxCandidates) {
         chairman = msg.sender;
         votingActive = false;
         resultsActive = false;
         createStakeHolder(msg.sender, 3); //add the chairperson as a stakeholder
         BODList.push(msg.sender); //add the chairperson to the BOD LIST
+        maximumCandidates = _maxCandidates;
     }
 
     
@@ -135,6 +137,7 @@ contract SimpleVoting {
         public
         onlyByChairman
     {
+        require(candidatesList.length <= maximumCandidates, "cannot add more candidates");
         uint256 candidateID;
         if (candidatesList.length == 0) {
             candidateID = 0;
